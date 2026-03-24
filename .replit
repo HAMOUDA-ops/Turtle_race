@@ -2,21 +2,20 @@ entrypoint = "main.py"
 modules = ["python-3.11"]
 
 [nix]
-channel = "stable-25_05"
-
-[unitTest]
-language = "python3"
-
-[gitHubImport]
-requiredFiles = [".replit", "replit.nix"]
-
-[deployment]
-run = ["python3", "main.py"]
-deploymentTarget = "cloudrun"
+channel = "stable-24_05"
 
 [agent]
 expertMode = true
 
+# أمر التشغيل الصحيح لفتح الشاشة الرسومية
+run = "python3 main.py"
+
+# إعدادات العرض التلقائي (الريغلاج السحري)
+[split_views]
+views = [
+  { "view" = "vnc" }
+]
+
 [[ports]]
 localPort = 5900
-externalPort = 9000
+externalPort = 80

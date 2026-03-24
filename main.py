@@ -1,17 +1,11 @@
-from turtle import Turtle, Screen
+import turtle
+import time
 
-mpapi = Turtle()
-chacha = Screen()
+# انتظر 5 ثوانٍ قبل البدء لتعطي فرصة للشاشة لتفتح
+time.sleep(5)
 
-mpapi.color('green')
+screen = turtle.Screen()
+t = turtle.Turtle()
+t.circle(100)
 
-def move():
-    mpapi.forward(500)
-    mpapi.left(50)
-    mpapi.forward(40)
-    mpapi.left(69)
-
-move()
-move()
-
-chacha.exitonclick()  # باش تبقى النافذة مفتوحة #fix
+turtle.done()
