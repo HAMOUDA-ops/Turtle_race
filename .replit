@@ -3,6 +3,7 @@ modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["python311Packages.tkinter"]
 
 [agent]
 expertMode = true
@@ -19,3 +20,26 @@ views = [
 [[ports]]
 localPort = 5900
 externalPort = 80
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "vnc"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PYTHONPATH=/nix/store/pv5vvspngggbxqdndyhrs4dhrbr2bwg4-python3.11-tkinter-3.11.9/lib/python3.11/site-packages:$PYTHONPATH python3 main.py"
