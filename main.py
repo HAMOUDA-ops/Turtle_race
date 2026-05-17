@@ -1,148 +1,158 @@
-import turtle
+import pygame
+import sys
 import random
 
-# ─────────────────────────────────────────────
-# WHY textinput() FAILS ON MOBILE / VNC
-# ─────────────────────────────────────────────
-# textinput() creates a small Tkinter pop-up dialog.
-# The VNC viewer streams the remote desktop as pixels,
-# so when that dialog opens the mobile OS has no way to
-# know a text field is waiting — it never raises the
-# soft keyboard. The fix: replace the dialog with
-# clickable turtle buttons. Taps/clicks are forwarded
-# correctly through VNC, so the user just taps a color.
-# ─────────────────────────────────────────────
+# 1. إعدادات اللعبة العامة
+pygame.init()
+SCREEN_WIDTH = 400
+SCREEN_HEIGHT = 600
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Flappy Bird - Hamoud Edition")
+clock = pygame.time.Clock()
 
-COLORS = ["red", "blue", "green"]
-FINISH_X = 280
-START_X  = -280
+# الألوان (RGB)
+SKY_BLUE = (113, 197, 207)
+YELLOW = (247, 216, 54)
+GREEN = (115, 191, 46)
+WHITE = (255, 255, 255)
 
-screen = turtle.Screen()
-screen.setup(width=700, height=500)
-screen.title("Turtle Race")
-screen.bgcolor("black")
-screen.tracer(0)
+# 2. كلاس الطائر (Bird)
+class Bird:
+    def __init__(self):
+        self.x = 80
+        self.y = SCREEN_HEIGHT // 2
+        self.radius = 16
+        self.gravity = 0.25
+        self.velocity = 0
+        self.jump_strength = -6.5
 
-# ── helper: draw a filled rounded-ish rectangle button ──
-def draw_button(pen, cx, cy, color):
-    w, h = 110, 45
-    pen.penup()
-    pen.goto(cx - w // 2, cy - h // 2)
-    pen.setheading(0)
-    pen.color("white", color)
-    pen.pensize(2)
-    pen.begin_fill()
-    for length in [w, h, w, h]:
-        pen.forward(length)
-        pen.left(90)
-    pen.end_fill()
-    pen.penup()
-    pen.goto(cx, cy - 8)
-    pen.color("white")
-    pen.write(color.upper(), align="center", font=("Arial", 15, "bold"))
+    def update(self):
+        self.velocity += self.gravity
+        self.y += self.velocity
 
-# ── draw the three bet buttons ──
-btn_pen = turtle.Turtle()
-btn_pen.hideturtle()
-btn_pen.speed(0)
+        # منع الطائر من الخروج من أسفل الشاشة
+        if self.y >= SCREEN_HEIGHT - self.radius:
+            self.y = SCREEN_HEIGHT - self.radius
+            self.velocity = 0
 
-BTN_Y = 30
-BTN_POSITIONS = [(-210, BTN_Y), (0, BTN_Y), (210, BTN_Y)]
+    def jump(self):
+        self.velocity = self.jump_strength
 
-for col, pos in zip(COLORS, BTN_POSITIONS):
-    draw_button(btn_pen, pos[0], pos[1], col)
+    def draw(self):
+        # رسم الطائر كدائرة صفراء
+        pygame.draw.circle(screen, YELLOW, (int(self.x), int(self.y)), self.radius)
 
-# ── instruction label ──
-msg = turtle.Turtle()
-msg.hideturtle()
-msg.penup()
-msg.color("white")
-msg.goto(0, 130)
-msg.write("Tap a color to place your bet:", align="center",
-          font=("Arial", 16, "bold"))
+# 3. كلاس الأنابيب (Pipe)
+class Pipe:
+    def __init__(self):
+        self.x = SCREEN_WIDTH + 50
+        self.width = 60
+        self.gap = 150  # الفتحة بين الأنبوب العلوي والسفلي
+        # توليد ارتفاع عشوائي للأنبوب العلوي
+        self.top_height = random.randint(50, SCREEN_HEIGHT - self.gap - 100)
+        self.bottom_height = SCREEN_HEIGHT - (self.top_height + self.gap)
+        self.speed = 3
+        self.passed = False  # لمعرفة إذا الطائر تجاوز الأنبوب لحساب النقاط
 
-screen.update()
+    def move(self):
+        self.x -= self.speed
 
-# ─────────────────────────────────────────────
-# RACE
-# ─────────────────────────────────────────────
-def start_race(bet):
-    screen.tracer(0)
-    btn_pen.clear()
-    msg.clear()
+    def draw(self):
+        # الأنبوب العلوي
+        top_rect = pygame.Rect(self.x, 0, self.width, self.top_height)
+        # الأنبوب السفلي
+        bottom_rect = pygame.Rect(self.x, SCREEN_HEIGHT - self.bottom_height, self.width, self.bottom_height)
 
-    # draw finish line
-    finish_pen = turtle.Turtle()
-    finish_pen.hideturtle()
-    finish_pen.penup()
-    finish_pen.goto(FINISH_X, -200)
-    finish_pen.setheading(90)
-    finish_pen.color("white")
-    finish_pen.pensize(2)
-    finish_pen.pendown()
-    finish_pen.forward(400)
+        pygame.draw.rect(screen, GREEN, top_rect)
+        pygame.draw.rect(screen, GREEN, bottom_rect)
 
-    # place turtles on the track
-    racers = []
-    for idx, color in enumerate(COLORS):
-        t = turtle.Turtle()
-        t.shape("turtle")
-        t.color(color)
-        t.penup()
-        t.goto(START_X, -80 + idx * 80)
-        racers.append(t)
+    def collide(self, bird):
+        # إعداد مستطيلات وهمية (Hitboxes) حول الأنابيب للتأكد من التصادم
+        top_rect = pygame.Rect(self.x, 0, self.width, self.top_height)
+        bottom_rect = pygame.Rect(self.x, SCREEN_HEIGHT - self.bottom_height, self.width, self.bottom_height)
 
-    screen.update()
-    screen.tracer(1)
+        # مستطيل حول الطائر
+        bird_rect = pygame.Rect(bird.x - bird.radius, bird.y - bird.radius, bird.radius * 2, bird.radius * 2)
 
-    # race loop
-    winner = None
-    while winner is None:
-        for t in racers:
-            t.forward(random.randint(1, 10))
-            if t.xcor() >= FINISH_X:
-                winner = t.pencolor()
-                break
+        # التحقق من التصادم أو إذا لمس الأرض
+        if bird_rect.colliderect(top_rect) or bird_rect.colliderect(bottom_rect) or bird.y <= 0:
+            return True
+        return False
 
-    # result banner
-    screen.tracer(0)
-    banner = turtle.Turtle()
-    banner.hideturtle()
-    banner.penup()
-    banner.goto(0, -210)
-    if bet == winner:
-        banner.color("gold")
-        banner.write(f"YOU WON!  {winner.upper()} wins!",
-                     align="center", font=("Arial", 18, "bold"))
-    else:
-        banner.color("tomato")
-        banner.write(f"YOU LOST.  {winner.upper()} won.",
-                     align="center", font=("Arial", 18, "bold"))
+# 4. دالة عرض النتيجة على الشاشة
+def display_score(score):
+    font = pygame.font.SysFont('Arial', 32, bold=True)
+    score_surface = font.render(f"Score: {score}", True, WHITE)
+    score_rect = score_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
+    screen.blit(score_surface, score_rect)
 
-    print(f"\nResult: {winner.upper()} won. Your bet: {bet.upper()}.")
-    if bet == winner:
-        print("You WON!")
-    else:
-        print("You lost.")
+# 5. الدالة الأساسية لتشغيل اللعبة
+def main():
+    bird = Bird()
+    pipes = [Pipe()]
+    score = 0
+    game_over = False
 
-    screen.update()
+    # مؤقت لتوليد أنابيب جديدة كل فترة
+    SPAWNPIPE = pygame.USEREVENT
+    pygame.time.set_timer(SPAWNPIPE, 1500)  # أنبوب جديد كل 1.5 ثانية
 
-# ─────────────────────────────────────────────
-# CLICK HANDLER  — detects which button was tapped
-# ─────────────────────────────────────────────
-def on_click(x, y):
-    for color, (cx, cy) in zip(COLORS, BTN_POSITIONS):
-        if abs(x - cx) < 55 and abs(y - cy) < 22:
-            screen.onclick(None)   # stop listening for more clicks
-            msg.clear()
-            msg.goto(0, 130)
-            msg.color("yellow")
-            msg.write(f"Bet placed: {color.upper()}!  Racing...",
-                      align="center", font=("Arial", 16, "bold"))
-            screen.update()
-            start_race(color)
-            return
+    while True:
+        # إدارة الأحداث (Events)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-screen.onclick(on_click)
-screen.listen()
-turtle.done()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    if not game_over:
+                        bird.jump()
+                    else:
+                        # إعادة تشغيل اللعبة إذا خسر وضغط Space
+                        main()
+
+            # توليد أنبوب جديد
+            if event.type == SPAWNPIPE and not game_over:
+                pipes.append(Pipe())
+
+        # تحديث عناصر اللعبة (إذا لم يكن هناك Game Over)
+        if not game_over:
+            bird.update()
+
+            for pipe in pipes:
+                pipe.move()
+
+                # التحقق من الخسارة
+                if pipe.collide(bird):
+                    game_over = True
+
+                # حساب النقاط عند تجاوز الأنبوب
+                if not pipe.passed and pipe.x + pipe.width < bird.x:
+                    pipe.passed = True
+                    score += 1
+
+            # حذف الأنابيب التي خرجت من الشاشة لتخفيف العبء على الذاكرة
+            pipes = [pipe for pipe in pipes if pipe.x + pipe.width > 0]
+
+        # رسم كل شيء على الشاشة
+        screen.fill(SKY_BLUE)  # تلوين الخلفية باللون الأزرق
+
+        for pipe in pipes:
+            pipe.draw()
+
+        bird.draw()
+        display_score(score)
+
+        # شاشة الخasارة
+        if game_over:
+            font = pygame.font.SysFont('Arial', 24, bold=True)
+            text_surface = font.render("Game Over! Press SPACE to Restart", True, WHITE)
+            text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+            screen.blit(text_surface, text_rect)
+
+        pygame.display.update()
+        clock.tick(60)  # تحديد سرعة اللعبة بـ 60 إطار في الثانية
+
+if __name__ == "__main__":
+    main()
